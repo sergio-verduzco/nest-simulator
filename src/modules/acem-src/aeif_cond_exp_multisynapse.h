@@ -1,5 +1,4 @@
-/*
- *  aeif_cond_exp_multisynapse.h
+/* *  aeif_cond_exp_multisynapse.h
  *
  *  This file is part of NEST.
  *
@@ -73,7 +72,8 @@ The following parameters can be set in the status dictionary.
 
 Dynamic state variables:
   V_m        double - Membrane potential in mV
-  g_ex       double - Excitatory synaptic conductance in nS.
+  g_ex_f     double - Fast excitatory synaptic conductance in nS.
+  g_ex_s     double - Slow excitatory synaptic conductance in nS.
   g_in       double - Inhibitory synaptic conductance in nS.
   w          double - Spike-adaptation current in pA.
 
@@ -106,8 +106,14 @@ Integration parameters
                           GSL integrator. Reduce it if NEST complains about
                           numerical instabilities.
 
-Author: Adapted from aeif_cond_alpha by Lyle Muller; full revision by Tanguy
-Fardet on December 2016
+The following dictionary can be retrieved with get_status:
+  receptor_types  - dictionary mapping synapse names to ports on neuron model
+
+In this particular version of the program, there is an additional input
+port for excitatory synapses with slow time constants. This is useful in
+replicating the Bashor 1998 model.
+
+Author: Adapted from aeif_cond_exp by Sergio Verduzco, January 2017
 
 Sends: SpikeEvent
 
@@ -117,7 +123,10 @@ References: Brette R and Gerstner W (2005) Adaptive Exponential
             Integrate-and-Fire Model as an Effective Description of
             Neuronal Activity. J Neurophysiol 94:3637-3642
 
-SeeAlso: iaf_cond_exp, aeif_cond_alpha
+            Bashor D P (1998) A large-scale model of some spinal 
+            reflex circuits. Biol Cybern 78:147-157.
+
+SeeAlso: iaf_cond_exp, aeif_cond_alpha, aeif_cond_exp
 */
 
 using namespace nest;
@@ -188,6 +197,20 @@ private:
   void calibrate();
   void update( const Time&, const long, const long );
 
+  /**
+   * Synapse types to connect to
+   * @note Excluded upper and lower bounds are defined as INF_, SUP_.
+   *       Excluding port 0 avoids accidental connections.
+   */
+  enum SynapseTypes
+  {
+    INF_SPIKE_RECEPTOR = 0,
+    EXC_FAST,               // 1
+    EXC_SLOW,               // 2
+    INH,                    // 3
+    SUP_SPIKE_RECEPTOR      // 4
+  };
+
   // END Boilerplate function declarations ----------------------------
 
   // Friends --------------------------------------------------------
@@ -220,12 +243,13 @@ private:
     double b;       //!< Spike-triggered adaptation in pA
     double V_th;    //!< Spike threshold in mV.
     double t_ref;   //!< Refractory period in ms.
-    double tau_syn_ex; //!< Excitatory synaptic rise time.
-    double tau_syn_in; //!< Excitatory synaptic rise time.
+    double tau_syn_ex_fast; //!< Fast excitatory synaptic decay constant
+    double tau_syn_ex_slow; //!< Slow excitatory synaptic decay constant
+    double tau_syn_in; //!< Inhibitory synaptic decay time.
     double I_e;        //!< Intrinsic current in pA.
 
     double gsl_error_tol; //!< error bound for GSL integrator
-
+    
     Parameters_(); //!< Sets default parameter values
 
     void get( DictionaryDatum& ) const; //!< Store current values in dictionary
@@ -251,9 +275,10 @@ public:
     enum StateVecElems
     {
       V_M = 0,
-      G_EXC, // 1
-      G_INH, // 2
-      W,     // 3
+      G_EXC_FAST, // 1
+      G_EXC_SLOW, // 2
+      G_INH,      // 3
+      W,          // 4
       STATE_VEC_SIZE
     };
 
@@ -283,7 +308,8 @@ public:
     UniversalDataLogger< aeif_cond_exp_multisynapse > logger_;
 
     /** buffers and sums up incoming spikes/currents */
-    RingBuffer spike_exc_;
+    RingBuffer spike_exc_fast_;
+    RingBuffer spike_exc_slow_;
     RingBuffer spike_inh_;
     RingBuffer currents_;
 
@@ -362,16 +388,22 @@ aeif_cond_exp_multisynapse::send_test_event( Node& target,
 inline port
 aeif_cond_exp_multisynapse::handles_test_event( SpikeEvent&, rport receptor_type )
 {
-  if ( receptor_type != 0 )
+  if ( !( receptor_type < SUP_SPIKE_RECEPTOR 
+       && receptor_type > INF_SPIKE_RECEPTOR ) )  
+  {
     throw UnknownReceptorType( receptor_type, get_name() );
-  return 0;
+    return 0;
+  }
+  return receptor_type;
 }
 
 inline port
 aeif_cond_exp_multisynapse::handles_test_event( CurrentEvent&, rport receptor_type )
 {
   if ( receptor_type != 0 )
+  {
     throw UnknownReceptorType( receptor_type, get_name() );
+  }
   return 0;
 }
 
@@ -380,7 +412,9 @@ aeif_cond_exp_multisynapse::handles_test_event( DataLoggingRequest& dlr,
   rport receptor_type )
 {
   if ( receptor_type != 0 )
+  {
     throw UnknownReceptorType( receptor_type, get_name() );
+  }
   return B_.logger_.connect_logging_device( dlr, recordablesMap_ );
 }
 
@@ -390,7 +424,14 @@ aeif_cond_exp_multisynapse::get_status( DictionaryDatum& d ) const
   P_.get( d );
   S_.get( d );
   Archiving_Node::get_status( d );
+  
+  DictionaryDatum receptor_type = new Dictionary();
 
+  ( *receptor_type )[ names::EXC_FAST ] = EXC_FAST;
+  ( *receptor_type )[ names::EXC_SLOW ] = EXC_SLOW;
+  ( *receptor_type )[ names::INH ] = INH;
+
+  ( *d )[ names::receptor_types ] = receptor_type;
   ( *d )[ names::recordables ] = recordablesMap_.get_list();
 }
 

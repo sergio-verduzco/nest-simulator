@@ -71,7 +71,9 @@ RecordablesMap< mynest::aeif_cond_exp_multisynapse >::create()
   insert_(
     names::V_m, &mynest::aeif_cond_exp_multisynapse::get_y_elem_< mynest::aeif_cond_exp_multisynapse::State_::V_M > );
   insert_(
-    names::g_ex, &mynest::aeif_cond_exp_multisynapse::get_y_elem_< mynest::aeif_cond_exp_multisynapse::State_::G_EXC > );
+    names::g_ex_fast, &mynest::aeif_cond_exp_multisynapse::get_y_elem_< mynest::aeif_cond_exp_multisynapse::State_::G_EXC_FAST > );
+  insert_(
+    names::g_ex_slow, &mynest::aeif_cond_exp_multisynapse::get_y_elem_< mynest::aeif_cond_exp_multisynapse::State_::G_EXC_SLOW > );
   insert_(
     names::g_in, &mynest::aeif_cond_exp_multisynapse::get_y_elem_< mynest::aeif_cond_exp_multisynapse::State_::G_INH > );
   insert_( names::w, &mynest::aeif_cond_exp_multisynapse::get_y_elem_< mynest::aeif_cond_exp_multisynapse::State_::W > );
@@ -107,11 +109,13 @@ mynest::aeif_cond_exp_multisynapse_dynamics( double,
   const double& V =
     is_refractory ? node.P_.V_reset_ : std::min( y[ S::V_M ], node.P_.V_peak_ );
   // shorthand for the other state variables
-  const double& g_ex = y[ S::G_EXC ];
+  const double& g_ex_f = y[ S::G_EXC_FAST ];
+  const double& g_ex_s = y[ S::G_EXC_SLOW ];
   const double& g_in = y[ S::G_INH ];
   const double& w = y[ S::W ];
 
-  const double I_syn_exc = g_ex * ( V - node.P_.E_ex );
+  // the excitatory current comes from fast and slow synapses
+  const double I_syn_exc = (g_ex_f  + g_ex_s ) * ( V - node.P_.E_ex );
   const double I_syn_inh = g_in * ( V - node.P_.E_in );
 
   const double I_spike = node.P_.Delta_T == 0.
@@ -125,8 +129,8 @@ mynest::aeif_cond_exp_multisynapse_dynamics( double,
     : ( -node.P_.g_L * ( V - node.P_.E_L ) + I_spike - I_syn_exc - I_syn_inh - w
         + node.P_.I_e + node.B_.I_stim_ ) / node.P_.C_m;
 
-  f[ S::G_EXC ] = -g_ex / node.P_.tau_syn_ex; // Synaptic Conductance (nS)
-
+  f[ S::G_EXC_FAST ] = -g_ex_f / node.P_.tau_syn_ex_fast; // Synaptic Conductance (nS)
+  f[ S::G_EXC_SLOW ] = -g_ex_s / node.P_.tau_syn_ex_slow; // Synaptic Conductance (nS)
   f[ S::G_INH ] = -g_in / node.P_.tau_syn_in; // Synaptic Conductance (nS)
 
   // Adaptation current w.
@@ -154,7 +158,8 @@ mynest::aeif_cond_exp_multisynapse::Parameters_::Parameters_()
   , a( 4.0 )          // nS
   , b( 80.5 )         // pA
   , V_th( -50.4 )     // mV
-  , tau_syn_ex( 0.2 ) // ms
+  , tau_syn_ex_fast( 0.2 ) // ms
+  , tau_syn_ex_slow( 0.2 ) // ms
   , tau_syn_in( 2.0 ) // ms
   , I_e( 0.0 )        // pA
   , gsl_error_tol( 1e-6 )
@@ -202,7 +207,8 @@ mynest::aeif_cond_exp_multisynapse::Parameters_::get( DictionaryDatum& d ) const
   def< double >( d, names::V_reset, V_reset_ );
   def< double >( d, names::E_ex, E_ex );
   def< double >( d, names::E_in, E_in );
-  def< double >( d, names::tau_syn_ex, tau_syn_ex );
+  def< double >( d, names::tau_syn_ex_fast, tau_syn_ex_fast );
+  def< double >( d, names::tau_syn_ex_slow, tau_syn_ex_fast );
   def< double >( d, names::tau_syn_in, tau_syn_in );
   def< double >( d, names::a, a );
   def< double >( d, names::b, b );
@@ -227,7 +233,8 @@ mynest::aeif_cond_exp_multisynapse::Parameters_::set( const DictionaryDatum& d )
   updateValue< double >( d, names::C_m, C_m );
   updateValue< double >( d, names::g_L, g_L );
 
-  updateValue< double >( d, names::tau_syn_ex, tau_syn_ex );
+  updateValue< double >( d, names::tau_syn_ex_fast, tau_syn_ex_fast );
+  updateValue< double >( d, names::tau_syn_ex_slow, tau_syn_ex_slow);
   updateValue< double >( d, names::tau_syn_in, tau_syn_in );
 
   updateValue< double >( d, names::a, a );
@@ -279,7 +286,7 @@ mynest::aeif_cond_exp_multisynapse::Parameters_::set( const DictionaryDatum& d )
     throw BadProperty( "Ensure that t_ref >= 0" );
   }
 
-  if ( tau_syn_ex <= 0 || tau_syn_in <= 0 || tau_w <= 0 )
+  if ( tau_syn_ex_fast <= 0 || tau_syn_ex_slow <= 0 || tau_syn_in <= 0 || tau_w <= 0 )
   {
     throw BadProperty( "All time constants must be strictly positive." );
   }
@@ -294,7 +301,8 @@ void
 mynest::aeif_cond_exp_multisynapse::State_::get( DictionaryDatum& d ) const
 {
   def< double >( d, names::V_m, y_[ V_M ] );
-  def< double >( d, names::g_ex, y_[ G_EXC ] );
+  def< double >( d, names::g_ex_fast, y_[ G_EXC_FAST ] );
+  def< double >( d, names::g_ex_slow, y_[ G_EXC_SLOW ] );
   def< double >( d, names::g_in, y_[ G_INH ] );
   def< double >( d, names::w, y_[ W ] );
 }
@@ -303,11 +311,12 @@ void
 mynest::aeif_cond_exp_multisynapse::State_::set( const DictionaryDatum& d, const Parameters_& )
 {
   updateValue< double >( d, names::V_m, y_[ V_M ] );
-  updateValue< double >( d, names::g_ex, y_[ G_EXC ] );
+  updateValue< double >( d, names::g_ex_fast, y_[ G_EXC_FAST ] );
+  updateValue< double >( d, names::g_ex_slow, y_[ G_EXC_SLOW ] );
   updateValue< double >( d, names::g_in, y_[ G_INH ] );
   updateValue< double >( d, names::w, y_[ W ] );
 
-  if ( y_[ G_EXC ] < 0 || y_[ G_INH ] < 0 )
+  if ( y_[ G_EXC_FAST ] < 0 || y_[ G_EXC_SLOW ] < 0 || y_[ G_INH ] < 0 )
     throw BadProperty( "Conductances must not be negative." );
 }
 
@@ -377,9 +386,11 @@ mynest::aeif_cond_exp_multisynapse::init_state_( const Node& proto )
 void
 mynest::aeif_cond_exp_multisynapse::init_buffers_()
 {
-  B_.spike_exc_.clear(); // includes resize
+  B_.spike_exc_fast_.clear(); // includes resize
+  B_.spike_exc_slow_.clear(); // includes resize
   B_.spike_inh_.clear(); // includes resize
   B_.currents_.clear();  // includes resize
+  // currents buffer?
   Archiving_Node::clear_history();
 
   B_.logger_.reset();
@@ -514,7 +525,8 @@ mynest::aeif_cond_exp_multisynapse::update( const Time& origin,
     }
 
     // apply spikes
-    S_.y_[ State_::G_EXC ] += B_.spike_exc_.get_value( lag );
+    S_.y_[ State_::G_EXC_FAST ] += B_.spike_exc_fast_.get_value( lag );
+    S_.y_[ State_::G_EXC_SLOW ] += B_.spike_exc_slow_.get_value( lag );
     S_.y_[ State_::G_INH ] += B_.spike_inh_.get_value( lag );
 
     // set new input current
@@ -530,14 +542,30 @@ mynest::aeif_cond_exp_multisynapse::handle( SpikeEvent& e )
 {
   assert( e.get_delay() > 0 );
 
-  if ( e.get_weight() > 0.0 )
-    B_.spike_exc_.add_value( e.get_rel_delivery_steps(
+  if ( e.get_weight() > 0.0 )  // excitatory synapse
+  {
+    if( e.get_rport() == EXC_FAST )
+      B_.spike_exc_fast_.add_value( e.get_rel_delivery_steps(
+                                 kernel().simulation_manager.get_slice_origin() ),
+                         e.get_weight() * e.get_multiplicity() );
+    else if( e.get_rport() == EXC_SLOW )
+      B_.spike_exc_slow_.add_value( e.get_rel_delivery_steps(
+                                 kernel().simulation_manager.get_slice_origin() ),
+                         e.get_weight() * e.get_multiplicity() );
+    else if( e.get_rport() == INH )
+      B_.spike_inh_.add_value( e.get_rel_delivery_steps(
                                kernel().simulation_manager.get_slice_origin() ),
-      e.get_weight() * e.get_multiplicity() );
-  else
-    B_.spike_inh_.add_value( e.get_rel_delivery_steps(
-                               kernel().simulation_manager.get_slice_origin() ),
-      -e.get_weight() * e.get_multiplicity() ); // keep conductances positive
+                       e.get_weight() * e.get_multiplicity() ); 
+    else
+      throw UnknownReceptorType( e.get_rport(), get_name() );
+  }
+  else 
+  {
+    throw BadProperty(
+      "Synaptic weights for conductance-based multisynapse models "
+      "must be positive." );
+  }
+
 }
 
 void
