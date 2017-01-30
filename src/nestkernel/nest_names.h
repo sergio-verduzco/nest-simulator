@@ -143,6 +143,8 @@ extern const Name eta;         //!< MSP growth curve parameter
 extern const Name events;      //!< Recorder parameter
 extern const Name
   ex_spikes; //!< Number of arriving excitatory spikes (sli_neuron)
+extern const Name EXC_FAST;    //!< Specific to aeif_cond_exp_multisynapse
+extern const Name EXC_SLOW;    //!< Specific to aeif_cond_exp_multisynapse
 
 extern const Name F_lower;
 extern const Name F_mean;
@@ -163,6 +165,8 @@ extern const Name g;             //!< Conductance
 extern const Name g_AMPA;        //!< specific to Hill & Tononi 2005
 extern const Name g_ahp;         //!< Specific to iaf_chxk_2008 neuron
 extern const Name g_ex;          //!< Excitatory conductance
+extern const Name g_ex_fast;     //!< Specific to aeif_cond_exp_multisynapse
+extern const Name g_ex_slow;     //!< Specific to aeif_cond_exp_multisynapse
 extern const Name g_GABA_A;      //!< specific to Hill & Tononi 2005
 extern const Name g_GABA_B;      //!< specific to Hill & Tononi 2005
 extern const Name g_in;          //!< inhibitory conductance
@@ -234,6 +238,7 @@ extern const Name
 extern const Name index_map;               //!< Parameters for MUSIC devices
 extern const Name individual_spike_trains; //!< Generator parameters
 extern const Name inh_conductance;         //!< Recorder parameter
+extern const Name INH;      //!< Specific to aeif_cond_exp_multisynapse
 extern const Name instant_unblock_NMDA;    //!< specific to Hill-Tononi
 extern const Name
   Interpol_Order;           //!< Interpolation order (precise timing neurons)
@@ -412,6 +417,8 @@ extern const Name tau_spike;       //!< Specific to Hill-Tononi (2005)
 extern const Name tau_stc;         //!< Specific to gif models
 extern const Name tau_syn;         //!< Synapse time constant
 extern const Name tau_syn_ex;      //!< Excitatory synaptic time constant
+extern const Name tau_syn_ex_fast; //!< Specific to aeif_cond_exp_multisynapse
+extern const Name tau_syn_ex_slow; //!< Specific to aeif_cond_exp_multisynapse
 extern const Name tau_syn_in;      //!< Inhibitory synaptic time constant
 extern const Name tau_theta;       //!< Specific to Hill-Tononi (2005)
 extern const Name tau_v;           //!< Specific to amat2_*

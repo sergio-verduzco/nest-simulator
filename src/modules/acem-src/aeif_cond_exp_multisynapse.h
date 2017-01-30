@@ -95,10 +95,12 @@ Spike adaptation parameters:
 
 Synaptic parameters
   E_ex       double - Excitatory reversal potential in mV.
-  tau_syn_ex double - Rise time of excitatory synaptic conductance in ms (exp
-                      function).
   E_in       double - Inhibitory reversal potential in mV.
-  tau_syn_in double - Rise time of the inhibitory synaptic conductance in ms
+  tau_syn_ex_fast double - Rise time of excitatory synaptic conductance in ms (exp
+                      function).
+  tau_syn_ex_slow double - Decay time of excitatory synaptic conductance in ms 
+		      (exp function).
+  tau_syn_in double - Decay time of the inhibitory synaptic conductance in ms
                       (exp function).
 
 Integration parameters
